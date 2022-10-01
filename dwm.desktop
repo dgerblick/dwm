@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=dwm
+Comment=dynamic window manager 
+Exec=startdwm
+Type=XSession
+X-LightDM-DesktopName=dwm
+DesktopNames=dwm
