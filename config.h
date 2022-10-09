@@ -1,10 +1,19 @@
 /* See LICENSE file for copyright and license details. */
 
+/* alt-tab configuration */
+static const unsigned int tabModKey 		= 0x40;	/* if this key is hold the alt-tab functionality stays acitve. This key must be the same as key that is used to active functin altTabStart `*/
+static const unsigned int tabCycleKey 		= 0x17;	/* if this key is hit the alt-tab program moves one position forward in clients stack. This key must be the same as key that is used to active functin altTabStart */
+static const unsigned int tabPosY 			= 1;	/* tab position on Y axis, 0 = bottom, 1 = center, 2 = top */
+static const unsigned int tabPosX 			= 1;	/* tab position on X axis, 0 = left, 1 = center, 2 = right */
+static const unsigned int maxWTab 			= 600;	/* tab menu width */
+static const unsigned int maxHTab 			= 200;	/* tab menu height */
+
 /* appearance */
 static const unsigned int borderpx  = 1;        /* border pixel of windows */
 static const unsigned int snap      = 32;       /* snap pixel */
 static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
+static const int focusonwheel       = 0;
 static const char *fonts[]          = { "monospace:size=10" };
 static const char dmenufont[]       = "monospace:size=10";
 static const char col_gray1[]       = "#282a36";
@@ -33,7 +42,7 @@ static const Rule rules[] = {
 /* layout(s) */
 static const float mfact     = 0.55; /* factor of master area size [0.05..0.95] */
 static const int nmaster     = 1;    /* number of clients in master area */
-static const int resizehints = 1;    /* 1 means respect size hints in tiled resizals */
+static const int resizehints = 0;    /* 1 means respect size hints in tiled resizals */
 static const int lockfullscreen = 1; /* 1 will force focus on the fullscreen window */
 
 static const Layout layouts[] = {
@@ -41,6 +50,8 @@ static const Layout layouts[] = {
 	{ "[]=",      tile },    /* first entry is default */
 	// { "><>",      NULL },    /* no layout function means floating behavior */
 	{ "[M]",      monocle },
+	{ "TTT",      bstack },
+	{ "===",      bstackhoriz },
 };
 
 /* key definitions */
@@ -79,6 +90,7 @@ static const Key keys[] = {
 	{ MODKEY|ShiftMask,             XK_0,      tag,            {.ui = ~0 } },
 	{ MODKEY,                       XK_Tab,    zoom,           {0} },
 	/* Program control */
+	{ Mod1Mask,                     XK_Tab,    altTabStart,    {0} },
 	{ MODKEY|ShiftMask,             XK_r,      quit,           {0} },
 	{ MODKEY|ShiftMask,             XK_q,      spawn,          SHCMD("pkill dwm") },
 	{ MODKEY,                       XK_c,      killclient,     {0} },
