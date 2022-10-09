@@ -1715,7 +1715,7 @@ altTab()
 		selmon->altTabN++;
 		if (selmon->altTabN >= selmon->nTabs)
 			selmon->altTabN = 0; /* reset altTabN */
-		
+
 		focus(selmon->altsnext[selmon->altTabN]);
 		restack(selmon);
 	}
@@ -1731,7 +1731,7 @@ altTabEnd()
 	if (selmon->isAlt == 0)
 		return;
 
-	/* 
+	/*
 	* move all clients between 1st and choosen position,
 	* one down in stack and put choosen client to the first position 
 	* so they remain in right order for the next time that alt-tab is used
@@ -1786,21 +1786,21 @@ drawTab(int nwins, int first, Monitor *m)
 		selmon->maxHTab = maxHTab;
 
 		/* decide position of tabwin */
-		int posX = 0;
-		int posY = 0;
+		int posX = selmon->mx;
+		int posY = selmon->my;
 		if (tabPosX == 0)
-			posX = 0;
+			posX += 0;
 		if (tabPosX == 1)
-			posX = (selmon->mw / 2) - (maxWTab / 2);
+			posX += (selmon->mw / 2) - (maxWTab / 2);
 		if (tabPosX == 2)
-			posX = selmon->mw - maxWTab;
+			posX += selmon->mw - maxWTab;
 
 		if (tabPosY == 0)
-			posY = selmon->mh - maxHTab;
+			posY += selmon->mh - maxHTab;
 		if (tabPosY == 1)
-			posY = (selmon->mh / 2) - (maxHTab / 2);
+			posY += (selmon->mh / 2) - (maxHTab / 2);
 		if (tabPosY == 2)
-			posY = 0;
+			posY += 0;
 
 		h = selmon->maxHTab;
 		/* XCreateWindow(display, parent, x, y, width, height, border_width, depth, class, visual, valuemask, attributes); just reference */
@@ -1845,8 +1845,8 @@ altTabStart(const Arg *arg)
 		selmon->isAlt = 1;
 		selmon->altTabN = 0;
 
-  		Client *c;
-  		Monitor *m = selmon;
+		Client *c;
+		Monitor *m = selmon;
 
 		m->nTabs = 0;
 		for(c = m->clients; c; c = c->next) { /* count clients */
@@ -1899,7 +1899,7 @@ altTabStart(const Arg *arg)
 					}
 				}
 
-				c = selmon->sel; 
+				c = selmon->sel;
 				altTabEnd(); /* end the alt-tab functionality */
 				/* XUngrabKeyboard(display, time); just a reference */
 				XUngrabKeyboard(dpy, CurrentTime); /* stop taking all input from keyboard */
