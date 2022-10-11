@@ -53,6 +53,7 @@
                                * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh) - MAX((y),(m)->wy)))
 #define INTERSECTC(x,y,w,h,z)   (MAX(0, MIN((x)+(w),(z)->x+(z)->w) - MAX((x),(z)->x)) \
                                * MAX(0, MIN((y)+(h),(z)->y+(z)->h) - MAX((y),(z)->y)))
+#define CLAMP(x,l,h)            (((x) < (l)) ? (l) : (((x) > (h)) ? (h) : (x)))
 #define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
 #define LENGTH(X)               (sizeof X / sizeof X[0])
 #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
@@ -66,7 +67,8 @@ enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel }; /* color schemes */
 enum { NetSupported, NetWMName, NetWMState, NetWMCheck,
        NetWMFullscreen, NetActiveWindow, NetWMWindowType,
-       NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
+       NetWMWindowTypeDialog, NetClientList, NetNumberOfDesktops,
+	   NetCurrentDesktop, NetLast }; /* EWMH atoms */
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
        ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
@@ -114,6 +116,7 @@ typedef struct {
 typedef struct {
 	const char *symbol;
 	void (*arrange)(Monitor *);
+	int majorAxis;       /* 0: none, 1: x-axis, 2: y-axis */
 } Layout;
 
 struct Monitor {
@@ -158,6 +161,7 @@ typedef struct {
 } Rule;
 
 /* function declarations */
+static void applydefaultlayouts();
 static void applyrules(Client *c);
 static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact);
 static void arrange(Monitor *m);
@@ -222,6 +226,7 @@ static void setfocus(Client *c);
 static void setfullscreen(Client *c, int fullscreen);
 static void setlayout(const Arg *arg);
 static void setmfact(const Arg *arg);
+static void setnumbdesktops(void);
 static void setup(void);
 static void seturgent(Client *c, int urg);
 static void showhide(Client *c);
@@ -240,6 +245,7 @@ static void unmapnotify(XEvent *e);
 static void updatebarpos(Monitor *m);
 static void updatebars(void);
 static void updateclientlist(void);
+static void updatecurrenddesktop(void);
 static int updategeom(void);
 static void updatenumlockmask(void);
 static void updatesizehints(Client *c);
@@ -302,6 +308,21 @@ static Window root, wmcheckwin;
 struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 /* function implementations */
+void
+applydefaultlayouts()
+{
+	Monitor *m;
+	int i = 0;
+	for (m = mons; m; m = m->next) {
+		if (i < LENGTH(lpm)) {
+			m->lt[0] = &layouts[lpm[i]];
+			m->lt[1] = &layouts[(lpm[i] + 1) % LENGTH(layouts)];
+			strncpy(m->ltsymbol, layouts[lpm[i]].symbol, sizeof m->ltsymbol);
+		}
+		i++;
+	}
+}
+
 void
 applyrules(Client *c)
 {
@@ -500,7 +521,7 @@ void
 cleanup(void)
 {
 	Arg a = {.ui = ~0};
-	Layout foo = { "", NULL };
+	Layout foo = { "", NULL, 0 };
 	Monitor *m;
 	size_t i;
 
@@ -1503,6 +1524,8 @@ resizemouse(const Arg *arg)
 		return;
 	if (c->isfullscreen) /* no support resizing fullscreen windows by mouse */
 		return;
+	if (c->mon->lt[c->mon->sellt]->majorAxis <= 0 || c->mon->lt[c->mon->sellt]->majorAxis >= 3)
+		return;
 	restack(selmon);
 	ocx = c->x;
 	ocy = c->y;
@@ -1512,10 +1535,15 @@ resizemouse(const Arg *arg)
 
 	if (c->isfloating || NULL == c->mon->lt[c->mon->sellt]->arrange) {
 		XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w + c->bw - 1, c->h + c->bw - 1);
-	} else {
+	} else if (c->mon->lt[c->mon->sellt]->majorAxis == 1) {
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0,
 			selmon->mx + (selmon->ww * selmon->mfact),
 			selmon->my + (selmon->wh / 2)
+		);
+	} else if (c->mon->lt[c->mon->sellt]->majorAxis == 2) {
+		XWarpPointer(dpy, None, root, 0, 0, 0, 0,
+			selmon->mx + (selmon->ww / 2),
+			selmon->my + (selmon->wh * selmon->mfact)
 		);
 	}
 
@@ -1528,15 +1556,24 @@ resizemouse(const Arg *arg)
 			handler[ev.type](&ev);
 			break;
 		case MotionNotify:
-			if ((ev.xmotion.time - lasttime) <= (1000 / 60))
+			if ((ev.xmotion.time - lasttime) <= (1000 / 20))
 				continue;
 			lasttime = ev.xmotion.time;
 
 			nw = MAX(ev.xmotion.x - ocx - 2 * c->bw + 1, 1);
 			nh = MAX(ev.xmotion.y - ocy - 2 * c->bw + 1, 1);
 
-			if (!selmon->lt[selmon->sellt]->arrange || c->isfloating)
+			if (!selmon->lt[selmon->sellt]->arrange || c->isfloating) {
 				resize(c, c->x, c->y, nw, nh, 1);
+			} else {
+				int majorAxis = c->mon->lt[c->mon->sellt]->majorAxis;
+				if (majorAxis == 1)
+					selmon->mfact = (double) (ev.xmotion.x_root - selmon->mx) / (double) selmon->ww;
+				else if (majorAxis == 2)
+					selmon->mfact = (double) (ev.xmotion.y_root - selmon->my) / (double) selmon->wh;
+				selmon->mfact = CLAMP(selmon->mfact, 0.05, 0.95);
+				// arrange(selmon);
+			}
 			break;
 		}
 	} while (ev.type != ButtonRelease);
@@ -1544,12 +1581,7 @@ resizemouse(const Arg *arg)
 	if (c->isfloating || NULL == c->mon->lt[c->mon->sellt]->arrange) {
 		XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w + c->bw - 1, c->h + c->bw - 1);
 	} else {
-		selmon->mfact = (double) (ev.xmotion.x_root - selmon->mx) / (double) selmon->ww;
 		arrange(selmon);
-		XWarpPointer(dpy, None, root, 0, 0, 0, 0,
-			selmon->mx + (selmon->ww * selmon->mfact),
-			selmon->my + (selmon->wh / 2)
-		);
 	}
 
 	XUngrabPointer(dpy, CurrentTime);
@@ -1718,6 +1750,13 @@ sendmon(Client *c, Monitor *m)
 }
 
 void
+setcurrentdesktop(void){
+	long data[] = { 0 };
+	XChangeProperty(dpy, root, netatom[NetCurrentDesktop], XA_CARDINAL, 32,
+					PropModeReplace, (unsigned char *)data, 1);
+}
+
+void
 setclientstate(Client *c, long state)
 {
 	long data[] = { state, None };
@@ -1821,6 +1860,13 @@ setmfact(const Arg *arg)
 }
 
 void
+setnumbdesktops(void){
+	long data[] = { TAGMASK };
+	XChangeProperty(dpy, root, netatom[NetNumberOfDesktops], XA_CARDINAL, 32,
+					PropModeReplace, (unsigned char *)data, 1);
+}
+
+void
 setup(void)
 {
 	int i;
@@ -1853,6 +1899,8 @@ setup(void)
 	netatom[NetWMState] = XInternAtom(dpy, "_NET_WM_STATE", False);
 	netatom[NetWMCheck] = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
 	netatom[NetWMFullscreen] = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+	netatom[NetNumberOfDesktops] = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
+	netatom[NetCurrentDesktop] = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
 	netatom[NetWMWindowType] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
 	netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
 	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
@@ -1879,6 +1927,10 @@ setup(void)
 	XChangeProperty(dpy, root, netatom[NetSupported], XA_ATOM, 32,
 		PropModeReplace, (unsigned char *) netatom, NetLast);
 	XDeleteProperty(dpy, root, netatom[NetClientList]);
+	/* set EWMH NUMBER_OF_DESKTOPS */
+	setnumbdesktops();
+	/* initialize EWMH CURRENT_DESKTOP */
+	setcurrentdesktop();
 	/* select events */
 	wa.cursor = cursor[CurNormal]->cursor;
 	wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask
@@ -2107,8 +2159,8 @@ altTabStart(const Arg *arg)
 
 			/* grab keyboard (take all input from keyboard) */
 			int grabbed = 1;
-			for (int i = 0;i < 1000;i++) {
-				if (XGrabKeyboard(dpy, DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync, CurrentTime) == GrabSuccess)
+			for (int i = 0;i < 1000; i++) {
+				if (XGrabKeyboard(dpy, DefaultRootWindow(dpy), True, GrabModeSync, GrabModeAsync, CurrentTime) == GrabSuccess)
 					break;
 				nanosleep(&ts, NULL);
 				if (i == 1000 - 1)
@@ -2190,8 +2242,8 @@ togglefloating(const Arg *arg)
 void
 togglefullscr(const Arg *arg)
 {
-  if(selmon->sel)
-    setfullscreen(selmon->sel, !selmon->sel->isfullscreen);
+	if(selmon->sel)
+		setfullscreen(selmon->sel, !selmon->sel->isfullscreen);
 }
 
 void
@@ -2219,6 +2271,7 @@ toggleview(const Arg *arg)
 		focus(NULL);
 		arrange(selmon);
 	}
+	updatecurrenddesktop();
 }
 
 void
@@ -2323,6 +2376,15 @@ updateclientlist()
 				(unsigned char *) &(c->win), 1);
 }
 
+void
+updatecurrenddesktop()
+{
+	long data[] = { selmon->tagset[selmon->seltags] };
+	
+	XChangeProperty(dpy, root, netatom[NetCurrentDesktop], XA_CARDINAL, 32,
+					PropModeReplace, (unsigned char *)data, 1);
+}
+
 int
 updategeom(void)
 {
@@ -2381,6 +2443,7 @@ updategeom(void)
 				selmon = mons;
 			cleanupmon(m);
 		}
+        applydefaultlayouts();
 		free(unique);
 	} else
 #endif /* XINERAMA */
@@ -2519,6 +2582,7 @@ view(const Arg *arg)
 		selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
 	focus(NULL);
 	arrange(selmon);
+	updatecurrenddesktop();
 }
 
 Client *

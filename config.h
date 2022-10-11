@@ -9,7 +9,7 @@ static const unsigned int maxWTab 			= 600;	/* tab menu width */
 static const unsigned int maxHTab 			= 200;	/* tab menu height */
 
 /* appearance */
-static const unsigned int borderpx  = 1;        /* border pixel of windows */
+static const unsigned int borderpx  = 2;        /* border pixel of windows */
 static const unsigned int snap      = 32;       /* snap pixel */
 static const unsigned int gappih    = 10;       /* horiz inner gap between windows */
 static const unsigned int gappiv    = 10;       /* vert inner gap between windows */
@@ -28,8 +28,8 @@ static const char col_gray4[]       = "#ffb86c";
 static const char col_cyan[]        = "#282a36";
 static const char *colors[][3]      = {
 	/*               fg         bg         border   */
-	[SchemeNorm] = { col_gray3, col_gray1, col_gray2 },
-	[SchemeSel]  = { col_gray4, col_cyan,  col_cyan  },
+	[SchemeNorm] = { col_gray3, col_gray1, col_cyan },
+	[SchemeSel]  = { col_gray4, col_cyan,  col_gray2  },
 };
 
 /* tagging */
@@ -53,32 +53,31 @@ static const int lockfullscreen = 1; /* 1 will force focus on the fullscreen win
 #define FORCE_VSPLIT 1  /* nrowgrid layout: force two clients to always split vertically */
 #include "vanitygaps.c"
 
+static const int lpm[] = {
+	/* Index of preferred layout], if LENGTH(lpm)<#monitors -> default layout */
+	4, 2
+};
+
 static const Layout layouts[] = {
-	/* symbol     arrange function */
-	{ "[]=",      tile },    /* first entry is default */
-	// { "[M]",      monocle },
-	// { "[@]",      spiral },
-	{ "[\\]",     dwindle },
-	// { "H[]",      deck },
-	{ "TTT",      bstack },
-	{ "===",      bstackhoriz },
-	{ "HHH",      grid },
-	{ "###",      nrowgrid },
-	{ "---",      horizgrid },
-	{ ":::",      gaplessgrid },
-	{ "|M|",      centeredmaster },
-	{ ">M>",      centeredfloatingmaster },
-	// { "><>",      NULL },    /* no layout function means floating behavior */
-	{ NULL,       NULL },
+	/* symbol     arrange function          major axis */
+	{ ">M>",      centeredfloatingmaster,   0 },
+	{ "|M|",      centeredmaster,           0 },
+	{ "TTT",      bstack,                   2 },
+	{ "===",      bstackhoriz,              2 },
+	{ "[]=",      tile,                     1 },
+	{ "[\\]",     dwindle,                  1 },
+	{ "HHH",      grid,                     0 },
+	{ "---",      horizgrid,                0 },
+	{ NULL,       NULL,                     0 },
 };
 
 /* key definitions */
 #define MODKEY Mod4Mask
 #define TAGKEYS(KEY,TAG) \
 	{ MODKEY,                       KEY,      view,           {.ui = 1 << TAG} }, \
-	{ MODKEY|ControlMask,           KEY,      toggletag,      {.ui = 1 << TAG} }, \
-	{ MODKEY|ShiftMask,             KEY,      tag,            {.ui = 1 << TAG} }, \
-	{ MODKEY|ControlMask|ShiftMask, KEY,      toggleview,     {.ui = 1 << TAG} },
+	{ MODKEY|Mod1Mask,              KEY,      toggletag,      {.ui = 1 << TAG} }, \
+	{ MODKEY|ControlMask,           KEY,      toggleview,     {.ui = 1 << TAG} }, \
+	{ MODKEY|ShiftMask,             KEY,      tag,            {.ui = 1 << TAG} },
 
 /* helper for spawning shell commands in the pre dwm-5.0 fashion */
 #define SHCMD(cmd) { .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL } }
@@ -86,76 +85,62 @@ static const Layout layouts[] = {
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
 	/* Launch Applications */
-	{ MODKEY,                       XK_space,  spawn,          SHCMD("rofi -modi 'drun,run' -show drun") },
-	{ MODKEY,                       XK_Return, spawn,          SHCMD("alacritty") },
-	{ MODKEY|ShiftMask,             XK_w,      spawn,          SHCMD("firefox") },
-	{ MODKEY|Mod1Mask,              XK_w,      spawn,          SHCMD("firefox --private-window") },
+	{ MODKEY,                       XK_space,           spawn,          SHCMD("rofi -modi 'drun,run' -show drun") },
+	{ MODKEY,                       XK_Return,          spawn,          SHCMD("alacritty") },
+	{ MODKEY|ShiftMask,             XK_w,               spawn,          SHCMD("firefox") },
+	{ MODKEY|Mod1Mask,              XK_w,               spawn,          SHCMD("firefox --private-window") },
 	/* Tags */
-	TAGKEYS(                        XK_1,                      0)
-	TAGKEYS(                        XK_2,                      1)
-	TAGKEYS(                        XK_3,                      2)
-	TAGKEYS(                        XK_4,                      3)
-	TAGKEYS(                        XK_5,                      4)
-	TAGKEYS(                        XK_6,                      5)
-	TAGKEYS(                        XK_7,                      6)
-	TAGKEYS(                        XK_8,                      7)
-	TAGKEYS(                        XK_9,                      8)
+	TAGKEYS(                        XK_1,                               0)
+	TAGKEYS(                        XK_2,                               1)
+	TAGKEYS(                        XK_3,                               2)
+	TAGKEYS(                        XK_4,                               3)
+	TAGKEYS(                        XK_5,                               4)
+	TAGKEYS(                        XK_6,                               5)
+	TAGKEYS(                        XK_7,                               6)
+	TAGKEYS(                        XK_8,                               7)
+	TAGKEYS(                        XK_9,                               8)
+	{ MODKEY,                       XK_minus,           focusmon,       {.i = -1 } },
+	{ MODKEY,                       XK_equal,           focusmon,       {.i = +1 } },
+	{ MODKEY|ShiftMask,             XK_minus,           tagmon,         {.i = -1 } },
+	{ MODKEY|ShiftMask,             XK_equal,           tagmon,         {.i = +1 } },
+	{ MODKEY,                       XK_0,               view,           {.ui = ~0 } },
+	{ MODKEY|ShiftMask,             XK_0,               tag,            {.ui = ~0 } },
+	{ MODKEY,                       XK_Tab,             zoom,           {0} },
 	/* Layouts */
-	{ MODKEY,                       XK_minus,  focusmon,       {.i = -1 } },
-	{ MODKEY,                       XK_equal,  focusmon,       {.i = +1 } },
-	{ MODKEY|ShiftMask,             XK_minus,  tagmon,         {.i = -1 } },
-	{ MODKEY|ShiftMask,             XK_equal,  tagmon,         {.i = +1 } },
-	{ MODKEY,                       XK_0,      view,           {.ui = ~0 } },
-	{ MODKEY|ShiftMask,             XK_0,      tag,            {.ui = ~0 } },
-	{ MODKEY,                       XK_Tab,    zoom,           {0} },
-	{ MODKEY|ControlMask,           XK_comma,  cyclelayout,    {.i = -1 } },
-	{ MODKEY|ControlMask,           XK_period, cyclelayout,    {.i = +1 } },
+	{ MODKEY|ControlMask,           XK_comma,           cyclelayout,    {.i = -1 } },
+	{ MODKEY|ControlMask,           XK_period,          cyclelayout,    {.i = +1 } },
+	{ MODKEY,                       XK_grave,           setlayout,      {0} },
+	{ MODKEY,                       XK_a,               setlayout,      {.v = &layouts[0]} },
+	{ MODKEY,                       XK_s,               setlayout,      {.v = &layouts[2]} },
+	{ MODKEY,                       XK_d,               setlayout,      {.v = &layouts[4]} },
+	{ MODKEY,                       XK_f,               togglefullscr,  {0} },
+	{ MODKEY,                       XK_g,               setlayout,      {.v = &layouts[6]} },
+	{ MODKEY,                       XK_bracketleft,     setmfact,       {.f = -0.05} },
+	{ MODKEY,                       XK_bracketright,    setmfact,       {.f = +0.05} },
+	{ MODKEY,                       XK_comma,           incnmaster,     {.i = -1 } },
+	{ MODKEY,                       XK_period,          incnmaster,     {.i = +1 } },
+	{ MODKEY|ShiftMask,             XK_space,           togglefloating, {0} },
 	/* Program control */
-	{ Mod1Mask,                     XK_Tab,    altTabStart,    {0} },
-	{ MODKEY|ShiftMask,             XK_r,      quit,           {0} },
-	{ MODKEY|ShiftMask,             XK_q,      spawn,          SHCMD("pkill dwm") },
-	{ MODKEY,                       XK_c,      killclient,     {0} },
+	{ Mod1Mask,                     XK_Tab,             altTabStart,    {0} },
+	{ MODKEY|ShiftMask,             XK_r,               quit,           {0} },
+	{ MODKEY|ShiftMask,             XK_q,               spawn,          SHCMD("pkill dwm") },
+	{ MODKEY,                       XK_c,               killclient,     {0} },
 
-	// { MODKEY,                       XK_b,      togglebar,      {0} },
-	// { MODKEY,                       XK_j,      focusstack,     {.i = +1 } },
-	// { MODKEY,                       XK_k,      focusstack,     {.i = -1 } },
-	// { MODKEY,                       XK_i,      incnmaster,     {.i = +1 } },
-	// { MODKEY,                       XK_d,      incnmaster,     {.i = -1 } },
-	// { MODKEY,                       XK_h,      setmfact,       {.f = -0.05} },
-	// { MODKEY,                       XK_l,      setmfact,       {.f = +0.05} },
-	// { MODKEY,                       XK_Return, zoom,           {0} },
-	// { MODKEY,                       XK_Tab,    zoom,           {0} },
-	// { MODKEY|ShiftMask,             XK_c,      killclient,     {0} },
-	// { MODKEY,                       XK_t,      setlayout,      {.v = &layouts[0]} },
-	// { MODKEY,                       XK_f,      setlayout,      {.v = &layouts[1]} },
-	// { MODKEY,                       XK_m,      setlayout,      {.v = &layouts[2]} },
-	// { MODKEY,                       XK_space,  setlayout,      {0} },
-	// { MODKEY|ShiftMask,             XK_space,  togglefloating, {0} },
 };
 
 /* button definitions */
 /* click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle, ClkClientWin, or ClkRootWin */
 static const Button buttons[] = {
-	/* click                event mask      button          function        argument */
-	{ ClkLtSymbol,          0,              Button1,        setlayout,      {0} },
-	{ ClkLtSymbol,          0,              Button3,        setlayout,      {.v = &layouts[5]} },
-	{ ClkWinTitle,          0,              Button2,        zoom,           {0} },
-	/* placemouse options, choose which feels more natural:
-	 *    0 - tiled position is relative to mouse cursor
-	 *    1 - tiled postiion is relative to window center
-	 *    2 - mouse pointer warps to window center
-	 *
-	 * The moveorplace uses movemouse or placemouse depending on the floating state
-	 * of the selected client. Set up individual keybindings for the two if you want
-	 * to control these separately (i.e. to retain the feature to move a tiled window
-	 * into a floating position).
-	 */
-	{ ClkClientWin,         MODKEY,         Button1,        moveorplace,    {.i = 2} },
-	{ ClkClientWin,         MODKEY,         Button2,        togglefloating, {0} },
-	{ ClkClientWin,         MODKEY,         Button3,        resizemouse,    {0} },
-	{ ClkTagBar,            0,              Button1,        view,           {0} },
-	{ ClkTagBar,            0,              Button3,        toggleview,     {0} },
-	{ ClkTagBar,            MODKEY,         Button1,        tag,            {0} },
-	{ ClkTagBar,            MODKEY,         Button3,        toggletag,      {0} },
+	/* click                event mask          button          function        argument */
+	{ ClkLtSymbol,          0,                  Button1,        setlayout,      {0} },
+	{ ClkLtSymbol,          0,                  Button3,        setlayout,      {.v = &layouts[5]} },
+	{ ClkClientWin,         MODKEY,             Button1,        moveorplace,    {.i = 2} },
+	{ ClkClientWin,         MODKEY,             Button2,        togglefloating, {0} },
+	{ ClkClientWin,         MODKEY|ShiftMask,   Button2,        killclient,     {0} },
+	{ ClkClientWin,         MODKEY,             Button3,        resizemouse,    {0} },
+	{ ClkTagBar,            0,                  Button1,        view,           {0} },
+	{ ClkTagBar,            0,                  Button3,        toggleview,     {0} },
+	{ ClkTagBar,            MODKEY,             Button1,        tag,            {0} },
+	{ ClkTagBar,            MODKEY,             Button3,        toggletag,      {0} },
 };
 
