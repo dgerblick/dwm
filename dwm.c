@@ -157,6 +157,7 @@ struct Monitor {
 	unsigned int tagset[2];
 	TagState tagstate;
 	int showbar;
+	int extbar;
 	int topbar;
 	Client *clients;
 	Client *sel;
@@ -728,6 +729,7 @@ createmon(void)
 	m->mfact = mfact;
 	m->nmaster = nmaster;
 	m->showbar = showbar;
+	m->extbar = extbar;
 	m->topbar = topbar;
 	m->gappih = gappih;
 	m->gappiv = gappiv;
@@ -814,7 +816,7 @@ drawbar(Monitor *m)
 	unsigned int i, occ = 0, urg = 0;
 	Client *c;
 
-	if (!m->showbar)
+	if (!m->showbar || m->extbar)
 		return;
 
 	/* draw status first so it can be overdrawn by tags later */
@@ -2464,7 +2466,7 @@ updatebars(void)
 	};
 	XClassHint ch = {"dwm", "dwm"};
 	for (m = mons; m; m = m->next) {
-		if (m->barwin)
+		if (m->barwin || m->extbar)
 			continue;
 		m->barwin = XCreateWindow(dpy, root, m->wx, m->by, m->ww, bh, 0, DefaultDepth(dpy, screen),
 				CopyFromParent, DefaultVisual(dpy, screen),
